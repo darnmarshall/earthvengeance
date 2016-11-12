@@ -4,12 +4,16 @@
   "description": "Earth Vengeance, massively multiplayer online dual arena",
   "main": "index.js",
   "scripts": {
-    "test": "echo \\\"Error: no test specified.... add something to package.json\" && exit 1\""
+    "test": "echo \\\"Error: no test specified.... add something to package.json\" && exit 1\"",
+    "start": "node index.js"
   },
   "repository": {
     "type": "git",
     "url": "https://github.com/darnmarshall/earthvengeance.git"
   },
   "author": "Darren Marshall",
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "lodash": "^4.16.6"
+  }
 }

@@ -1,1 +1,4 @@
-console.log("Hello World!");
+
+// index.js
+
+require('./app/index')
