@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<title>Asteroids - A 3D version using three.js and WebGL, by Darren marshall, using example material from three.js</title>
+	<meta charset="utf-8">
+	<link rel="stylesheet" href="font-awesome.min.css">
+	<style>
+		body {
+			margin: 0px;
+			background-color: #000000;
+			color: #fff;
+			overflow: hidden;
+		}
+
+		div {
+			position: absolute;
+			z-index: 10;
+			color: #fff;
+			font-family: monospace;
+			text-align: center;
+			margin: 10px;
+			width: 100%;
+		}
+
+		label, input {
+			cursor: pointer;
+		}
+
+		#topLeftMenu {
+			top: 0px;
+			left: 0px;
+			position: fixed;
+		}
+
+		#topLeftMenu p {
+			float: left;
+			text-align: left;
+		}
+
+		#gameOverDialog {
+			width: 300px;
+			height: 300px;
+			left: 50%;
+			top: 50%;
+			position: fixed;
+			margin-left: -150px;
+			margin-right: -150px;
+			display: none;
+			text-align: center;
+		}
+
+		#messages {
+			width: 300px;
+			height: 300px;
+			left: 50%;
+			top: 50%;
+			position: fixed;
+			margin-left: -150px;
+			margin-right: -150px;
+			text-align: center;
+		}
+
+	</style>
+</head>
+<body>
+
+<script src="js/three.min.js"></script>
+<script src="js/jquery-1.9.1.min.js"></script>
+<script src="js/taffy-min.js"></script>
+
+<script src="js/shaders/CopyShader.js"></script>
+<script src="js/shaders/EdgeShader.js"></script>
+
+<script src="js/controls/PointWadsControls.js"></script>
+<script src="js/Detector.js"></script>
+
+<script src="js/objects/SunObject.js"></script>
+
+<script src="js/postprocessing/EffectComposer.js"></script>
+<script src="js/postprocessing/RenderPass.js"></script>
+<script src="js/postprocessing/MaskPass.js"></script>
+<script src="js/postprocessing/ShaderPass.js"></script>
+
+<div id="topLeftMenu"><p id="lives">Lives: <i class="icon-plane"></i><i class="icon-plane"></i><i class="icon-plane"></i></p></div>
+<div id="messages"></div>
+<div id="gameOverDialog">
+	<h1>Game Over</h1>
+	<h2>Level: </h2>
+	<form>
+		<button id="restart">Restart</button>
+	</form>
+</div>
+
+
+<script>
+	if ( ! Detector.webgl ) Detector.addGetWebGLMessage();
+
+	var camera, scene, light, controls, ambient, renderer, composer, clock;
+	var asteroids;
+	var vertex = [];
+	pi = 3.14159265358979323846264338327950288419716939937510582;
+	limit = 2500;
+	asteroidMinSpeed = 1;
+	asteroidMaxSpeed = 10;
+	asteroidMinSize = 400;
+	asteroidMaxSize = 500;
+	asteroidIncSize = 200;
+	beginningAsteroids = [1,1];
+	numStars = 500;
+	starFieldHeight = 10000;
+	starFieldWidth = 10000;
+	minStarDistance = 2000;
+	maxStarDistance = 3500;
+	bulletSpeed = 10;
+	dead = false;
+	lives = 2;
+	shield = 200; //starting shield
+	paused = false;
+	gameLevel = 1;
+	var highScoreDB;
+
+	var bullets;
+	var bulletGeometry, astGeometry;
+	var bulletMaterial, astMaterial;
+
+	var cursor;
+
+	var myship;
+	
+	var startPosition = new THREE.Vector3(1000,1000,0);
+	
+	var sun;
+
+	var rgbShiftEffect, edgeEffect;
+
+	init();
+	animate();
+
+	function init() {
+		renderer = new THREE.WebGLRenderer();
+		renderer.setSize( window.innerWidth, window.innerHeight );
+		document.body.appendChild( renderer.domElement );
+
+		scene = new THREE.Scene();
+
+		light = new THREE.DirectionalLight( 0xff9999 );
+		light.position.set( 1, 1, 1 );
+		scene.add( light );
+
+		ambient = new THREE.AmbientLight( 0x404040 );
+		scene.add( ambient );
+
+
+		myship = constructMyShip();
+		myship.position.x = 1000;
+		myship.position.y = 0;
+		scene.add(myship);
+		myship.position = startPosition;
+
+		setupControls();
+
+		camera = new THREE.PerspectiveCamera( 70, window.innerWidth / window.innerHeight, 1, 20000 );
+		camera.position.z = 1000;
+		camera.position.x = 0;
+		camera.position.y = 0;
+
+		camera.lookAt(new THREE.Vector3(0,0,0));
+		// camera.rotateOnAxis(new THREE.Vector3(0,0,1), pi * 0.5);
+
+		//asteroids
+		// astMaterial = new THREE.MeshPhongMaterial( { color: 0xffffff, opacity: 0, shading: THREE.FlatShading } );
+		// asteroids = new THREE.Object3D();
+
+		// for(level = 0; level < beginningAsteroids.length; level++) {
+		// 	for(i = 0; i < beginningAsteroids[level]; i++) {
+		// 		newAsteroid = constructAsteroid(level);
+
+		// 		asteroids.add(newAsteroid);
+		// 	}
+		// }
+		// scene.add( asteroids);
+
+
+		//xyz indicators
+		var geometry = new THREE.SphereGeometry( 10, 32, 32 );
+		var material = new THREE.MeshBasicMaterial( {color: 0xaaaaaa} );
+		cursor = new THREE.Mesh( geometry, material );
+		scene.add(cursor);
+
+		for(i=0; i < 1000; i+=200) {
+			var geometry = new THREE.SphereGeometry( 10, 32, 32 );
+			var material = new THREE.MeshBasicMaterial( {color: 0xff0000} );
+			var sphere = new THREE.Mesh( geometry, material );
+			sphere.position.x = i;
+			scene.add(sphere);
+
+			var geometry = new THREE.SphereGeometry( 10, 32, 32 );
+			var material = new THREE.MeshBasicMaterial( {color: 0x00ff00} );
+			var sphere = new THREE.Mesh( geometry, material );
+			sphere.position.y = i;
+			scene.add(sphere);
+
+			var geometry = new THREE.SphereGeometry( 10, 32, 32 );
+			var material = new THREE.MeshBasicMaterial( {color: 0x0000ff} );
+			var sphere = new THREE.Mesh( geometry, material );
+			sphere.position.z = i;
+			scene.add(sphere);
+		}
+
+
+		//sun
+		sun = new THREE.SunObject(200, 0, 0);
+		scene.add(sun);
+		
+
+		//stars
+		starGeometry = new THREE.Geometry();
+
+		for ( i = 0; i < numStars; i ++ ) {
+
+			var pVert = new THREE.Vector3();
+			pVert.x = Math.random() * starFieldWidth - (starFieldWidth / 2);
+			pVert.y = Math.random() * starFieldHeight - (starFieldHeight / 2);
+			pVert.z = -(Math.random() * (maxStarDistance - minStarDistance) + minStarDistance);
+
+			starGeometry.vertices.push( pVert );
+		}
+
+		material = new THREE.ParticleBasicMaterial( { size: 1 } );
+		stars = new THREE.ParticleSystem( starGeometry, material );
+		scene.add( stars );
+		
+
+
+		bulletGeometry = new THREE.SphereGeometry( 1, 1, 1 );
+		bulletMaterial = new THREE.MeshPhongMaterial( { color: 0xffffff, shading: THREE.FlatShading } );
+		bullets = new THREE.Object3D();
+
+		scene.add( bullets);
+
+
+
+		// postprocessing
+
+		composer = new THREE.EffectComposer( renderer );
+		composer.addPass( new THREE.RenderPass( scene, camera ) );
+
+		edgeEffect = new THREE.ShaderPass( THREE.CopyShader );
+		// edgeEffect.uniforms[ 'aspect' ].value.x = window.innerWidth;
+		// edgeEffect.uniforms[ 'aspect' ].value.y = window.innerHeight;
+		composer.addPass( edgeEffect );
+
+		var effect = new THREE.ShaderPass( THREE.CopyShader);
+		effect.renderToScreen = true;
+		composer.addPass( effect );
+
+		//
+
+		window.addEventListener( 'resize', onWindowResize, false );
+
+		edgeEffect.enabled = true;
+
+	}
+
+	function onWindowResize() {
+
+		camera.aspect = window.innerWidth / window.innerHeight;
+		camera.updateProjectionMatrix();
+
+		renderer.setSize( window.innerWidth, window.innerHeight );
+
+
+		controls.handleResize();
+
+	}
+
+	function animate() {
+
+		if(!paused) {
+
+		requestAnimationFrame( animate );
+
+
+		var time = Date.now();
+
+
+
+		cursor.position.x = controls.mousePos.x;
+		cursor.position.y = controls.mousePos.y;
+		cursor.position.z = controls.mousePos.z;
+
+		controls.update( clock.getDelta() );
+		
+		doGravity();
+		checkCollisions();
+		
+		var cameraTarget = new THREE.Vector3();
+		
+		cameraTarget.x = (myship.position.x + sun.position.x) / 2;
+		cameraTarget.y = (myship.position.y + sun.position.y) / 2;
+		cameraTarget.z = myship.position.distanceTo(sun.position) / 3 + 1000;
+		
+		camera.position.x = cameraTarget.x;
+		camera.position.y = cameraTarget.y;
+		camera.position.z = cameraTarget.z;
+
+
+		composer.render();
+		//renderer.render(scene, camera);
+
+		}
+	}
+
+	function doGravity() {
+		//gravity
+		if(myship.position.distanceTo(sun.position) < 2000) {
+			var gravityVector = new THREE.Vector3();
+			gravityVector.subVectors(sun.position, myship.position);
+
+			//F = GM1M2/R^2
+			G = 10;
+			sunMass = 2490;
+			shipMass = 30;
+			distanceToSun = myship.position.distanceTo(sun.position);
+			gravityVector.setLength(Math.min((G * sunMass * shipMass) / (distanceToSun * distanceToSun), 100));
+			// gravityVector.setLength(1);
+			
+			myship.position.addVectors(myship.position, gravityVector);
+		}
+	}
+
+	function checkCollisions() {
+		//gravity
+		if(myship.position.distanceTo(sun.position) < 2000) {
+			var gravityVector = new THREE.Vector3();
+			gravityVector.subVectors(sun.position, myship.position);
+
+			//F = GM1M2/R^2
+			G = 10;
+			sunMass = 2490;
+			shipMass = 30;
+			distanceToSun = myship.position.distanceTo(sun.position);
+			gravityVector.setLength(Math.min((G * sunMass * shipMass) / (distanceToSun * distanceToSun), 100));
+			// gravityVector.setLength(1);
+			
+			myship.position.addVectors(myship.position, gravityVector);
+		}
+	}
+
+	function levelOver() {
+		for(level = 0; level < beginningAsteroids.length; level++) {
+			beginningAsteroids[level]++;
+			for(i = 0; i < beginningAsteroids[level]; i++) {
+				newAsteroid = constructAsteroid(level);
+
+				asteroids.add(newAsteroid);
+			}
+		}
+		if(beginningAsteroids[level] > level)
+			beginningAsteroids.push(0); //add a level of complexity
+		gameLevel++;
+		shield = 50;
+		displayMessage("Level " + gameLevel);
+	}
+
+	function die() {
+		dead = true;
+		scene.remove(myship);
+		$('#lives i').eq(0).remove();
+		setTimeout(function(){
+			if(lives > 0) {
+				lives--;
+				backToLife();
+			} else {
+				gameOver();
+			}
+		}, 2000);
+	}
+
+	function backToLife() {
+		if(lives == 0)
+			displayMessage("This is your last life!");
+		else {
+			displayMessage("Get Ready!");
+		}
+		dead = false;
+		shield = 100;
+		myship = constructMyShip();
+		myship.position.x = 500;
+		myship.position.y = 500;
+		scene.add(myship);
+		setupControls();
+	}
+
+	function displayMessage(msg) {
+			$('#messages p').remove();
+			$('#messages').append('<p>' + msg + '</p>');
+			$('#messages p').show();
+			setTimeout(function(){
+				$('#messages p').fadeOut();
+			}, 2000);
+	}
+
+	function gameOver() {
+
+		// $.getJSON("3dasteroids.json", function(data) {
+		//     highScoreDB = TAFFY(data);
+		//     highScoreDB.insert({name:"darren",score:"12345"});
+		//     highScoreDB.insert({name:"darr2en",score:"122352345"});
+		//     highScoreDB.insert({name:"dar4ren",score:"12352345"});
+		//     // data is a JavaScript object now. Handle it as such
+
+		// });
+		$('#gameOverDialog h2').text("You got to Level " + gameLevel);
+		$('#gameOverDialog').slideDown();
+	}
+
+  // function getHighScore() {
+  //   return [
+  //     {"id":1,"gender":"M","first":"John","last":"Smith",
+  //       "city":"Seattle, WA","status":"Active"},
+  //     {"id":2,"gender":"F","first":"Kelly","last":"Ruth",
+  //       "city":"Dallas, TX","status":"Active"},
+  //     {"id":3,"gender":"M","first":"Jeff","last":"Stevenson",
+  //       "city":"Washington, D.C.","status":"Active"},
+  //     {"id":4,"gender":"F","first":"Jennifer","last":"Gill",
+  //       "city":"Seattle, WA","status":"Active"}  
+  //   ];
+  // };
+
+	function fireWeapon() {
+		bullet = new THREE.Mesh( bulletGeometry, bulletMaterial );
+		bullet.position = myship.geometry.vertices[1].clone();
+		bullet.position.applyMatrix4(myship.matrixWorld);
+		bullet.scale.x = bullet.scale.y = bullet.scale.z = 5;
+		bullet.rotation.set( Math.random() * 2, Math.random() * 2, Math.random() * 2 );
+
+		bullet.todo = myship.deltaposition.clone().multiplyScalar(2.5);
+		bullet.todo.add(myship.deltaposition.setLength(bulletSpeed));
+		bullet.life = 500;
+
+		bullets.add(bullet);
+	}
+
+	function togglePauseGame() {
+		paused = !paused;
+		if(paused) {
+			$('#messages').append('<p>Paused</p><p>Press Q to unpause</p>');
+			$('#messages p').show();
+		} else {
+			$('#messages p').remove();
+			animate();
+		}
+	}
+
+	function constructAsteroid(level, position) {
+		astGeometry = new THREE.SphereGeometry( 1, 4 + 2 * level, 4 + 2 * level);
+
+		for(i = 0; i < astGeometry.vertices.length; i++) {
+			astGeometry.vertices[i].x += Math.random() * asteroidIncSize * level * 0.002;
+			astGeometry.vertices[i].y += Math.random() * asteroidIncSize * level * 0.002;
+			astGeometry.vertices[i].z += Math.random() * asteroidIncSize * level * 0.002;
+		}
+
+		newAsteroid = new THREE.Mesh( astGeometry, astMaterial );
+
+		if(position == undefined) {
+			newAsteroid.position.x = Math.random() * (limit * 2) - limit;
+			newAsteroid.position.y = Math.random() * (limit * 2) - limit;
+			newAsteroid.position.z = Math.random() * (limit * 2) - limit;
+		} else {
+			newAsteroid.position = position;
+		}
+
+		newAsteroid.level = level;
+
+		newAsteroid.scale.x = newAsteroid.scale.y = newAsteroid.scale.z = Math.random() * ((asteroidMaxSize - asteroidMinSize) + asteroidMinSize) + asteroidIncSize * (level+1);
+		newAsteroid.rotation.set( Math.random() * 2, Math.random() * 2, Math.random() * 2 );
+
+		newAsteroid.velocity = new THREE.Vector3();
+
+		newAsteroid.velocity.x = Math.random() * (asteroidMaxSpeed - asteroidMinSpeed) + asteroidMinSpeed;
+		newAsteroid.velocity.y = Math.random() * (asteroidMaxSpeed - asteroidMinSpeed) + asteroidMinSpeed;
+		newAsteroid.velocity.z = Math.random() * (asteroidMaxSpeed - asteroidMinSpeed) + asteroidMinSpeed;
+
+		if(Math.random() > 0.5) newAsteroid.velocity.x *= -1;
+		if(Math.random() > 0.5) newAsteroid.velocity.y *= -1;
+		if(Math.random() > 0.5) newAsteroid.velocity.z *= -1;
+		return newAsteroid;
+	}
+
+	function constructMyShip() {
+		var geom = new THREE.Geometry(); 
+		// var v0 = new THREE.Vector3(0,	0,	-1000);
+		// var v1 = new THREE.Vector3(300,0,	0);
+		// var v2 = new THREE.Vector3(-300,	0,	0);
+		// var v3 = new THREE.Vector3(0,	300,0);
+		// var v4 = new THREE.Vector3(0, 	0,	300);
+
+		// var v0 = new THREE.Vector3(0,	1000,	0);
+		// var v1 = new THREE.Vector3(-300,	0,		0);
+		// var v2 = new THREE.Vector3(300,0,		0);
+		// var v3 = new THREE.Vector3(0,	0,		300);
+		// var v4 = new THREE.Vector3(0, 	-300,	0);
+
+		// geom.vertices.push(v0);
+		// geom.vertices.push(v1);
+		// geom.vertices.push(v2);
+		// geom.vertices.push(v3);
+		// geom.vertices.push(v4);
+
+		// geom.faces.push( new THREE.Face3( 0, 3, 1 ) );
+		// geom.faces.push( new THREE.Face3( 0, 2, 3 ) );
+		// geom.faces.push( new THREE.Face3( 1, 3, 4 ) );
+		// geom.faces.push( new THREE.Face3( 3, 2, 4 ) );
+		// geom.faces.push( new THREE.Face3( 0, 2, 4 ) );
+		// geom.faces.push( new THREE.Face3( 0, 1, 2 ) );
+		// geom.faces.push( new THREE.Face3( 4, 2, 1 ) );
+		// geom.computeFaceNormals();
+
+		var geom = new THREE.BoxGeometry( 30, 30, 130 );
+
+		
+		shipMaterial = new THREE.MeshPhongMaterial( { color: 0xffffff, emissive: 0x444444, shading: THREE.FlatShading } );
+		shipMaterial.opacity = 0.3;
+
+		ship = new THREE.Mesh( geom, shipMaterial);
+
+		ship.matrixAutoUpdate = true;
+
+		return ship;
+	}
+
+	function setupControls() {
+		controls = new THREE.PointWadsControls( myship );
+		controls.currentSpeedForward = 1.0;
+		controls.moventSpeed = 10;
+		controls.lookSpeed = 0.5;
+		controls.lookVertical = true;
+		clock = new THREE.Clock();
+	}
+
+	function linear(value, startMin, startMax, endMin, endMax) {
+		diff = value - startMin;
+		percent = diff / (startMax - startMin);
+
+		return Math.max(Math.min(percent * (endMax-endMin) + endMin, endMax), endMin);
+	}
+
+	function collided(mesh1, mesh2){
+		return true;
+	}
+
+	Array.prototype.remove = function(from, to) {
+		var rest = this.slice((to || from) + 1 || this.length);
+		this.length = from < 0 ? this.length + from : from;
+		return this.push.apply(this, rest);
+	};
+
+
+</script>
+</body>
+</html>
