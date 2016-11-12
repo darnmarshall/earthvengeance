@@ -1,0 +1,15 @@
+{
+  "name": "earthvengeance.com",
+  "version": "0.1.0",
+  "description": "Earth Vengeance, massively multiplayer online dual arena",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \\\"Error: no test specified.... add something to package.json\" && exit 1\""
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/darnmarshall/earthvengeance.git"
+  },
+  "author": "Darren Marshall",
+  "license": "MIT"
+}
