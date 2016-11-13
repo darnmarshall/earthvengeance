@@ -108,14 +108,27 @@ function kickUnresponsivePlayers() {
 	}
 }
 
+function packPlayerData() {
+	sendableData = [];
+	for (var key in players) {
+		if (players.hasOwnProperty(key)) {
+			player = players[key]
+			sendableData.push(JSON.stringify(players[key]));
+		}
+	}
+	return "[" + sendableData.join() + "]";
+}
+
 setInterval (function () {
 	kickUnresponsivePlayers();
-	console.log('heartbeat. ' + players.length + ' players. Next ID: ' + nextID);
-	
-	json = JSON.stringify(players);
-	console.log(players);console.log(json);
-	io.emit('update', json);
-}, 1000);
+	// console.log('heartbeat. ' + players.length + ' players. Next ID: ' + nextID);
+
+	playerdata = packPlayerData();
+
+	// console.log(players);
+	// console.log(playerdata);
+	io.emit('update', playerdata);
+}, 10);
 
 http.listen(80, function(){
   console.log('listening on *:80');
