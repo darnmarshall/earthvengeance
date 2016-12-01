@@ -11,8 +11,7 @@ const app = express()
 
 app.engine('.hbs', exphbs({  
 	defaultLayout: 'main',
-	extname: '.hbs',
-	layoutsDir: path.join(__dirname, 'views/layouts')
+	extname: '.hbs'
 }))
 app.set('view engine', '.hbs')  
 app.set('views', path.join(__dirname, 'views'))
@@ -20,7 +19,7 @@ app.set('views', path.join(__dirname, 'views'))
 app.use(express.static(path.join(__dirname, 'public')))
 
 app.get('/', (request, response) => {  
-	response.render('game', {
+	response.render('index', {
 		name: 'John'
 	})
 })
